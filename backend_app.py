@@ -1,9 +1,8 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template, redirect, url_for
 import os
-from typing import Dict, Any, Union
 from motor_controller_interface import IMotorController
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
 # Configure based on environment
 def get_motor_controller() -> IMotorController:
@@ -19,6 +18,47 @@ def get_motor_controller() -> IMotorController:
         return RealMotorClient("http://real-motor-api:8080")
 
 motor_controller = get_motor_controller()
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    """Render the main UI dashboard and handle form submissions."""
+    status = motor_controller.get_status()
+    health = {"status": "healthy"}
+    message = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        try:
+            if action == 'start':
+                response = motor_controller.start_motor()
+                message = response.get("message")
+            elif action == 'stop':
+                response = motor_controller.stop_motor()
+                message = response.get("message")
+            elif action == 'set_speed':
+                speed = request.form.get('speed')
+                if not speed:
+                    message = "Speed parameter is required"
+                else:
+                    try:
+                        speed = float(speed)
+                        response = motor_controller.set_speed(speed)
+                        message = response.get("message")
+                    except ValueError:
+                        message = "Speed must be a numeric value"
+            elif action == 'refresh_status':
+                pass  # Status is already fetched
+            status = motor_controller.get_status()  # Update status after action
+        except Exception as e:
+            message = f"Error: {str(e)}"
+
+    try:
+        health_response = motor_controller.get_status()  # Assuming health is tied to status
+        health = {"status": "healthy" if health_response.get("is_running") is not None else "unhealthy"}
+    except Exception:
+        health = {"status": "unhealthy"}
+
+    return render_template('index.html', status=status, health=health, message=message)
 
 @app.route('/control/start', methods=['POST'])
 def start_motor_command() -> tuple:
