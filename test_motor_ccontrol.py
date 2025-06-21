@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from backend_app import app
+from app import app
 from mock_motor_controller import MockMotorController
 
 class TestMotorControlService(unittest.TestCase):
